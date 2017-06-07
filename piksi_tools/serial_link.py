@@ -255,7 +255,7 @@ def get_uuid(channel, serial_id):
     return uuid.uuid5(uuid.UUID(channel), str(-serial_id))
   else:
     return None
-
+running = True
 def run(args, link):
   """Spin loop for reading from the serial link.
 
@@ -267,13 +267,14 @@ def run(args, link):
     Piksi serial handle
 
   """
+  global running
   timeout = args.timeout
   if args.reset:
     link(MsgReset(flags=0))
   try:
     if args.timeout is not None:
       expire = time.time() + float(args.timeout)
-    while True:
+    while running:
       if timeout is None or time.time() < expire:
       # Wait forever until the user presses Ctrl-C
         time.sleep(1)
@@ -290,7 +291,7 @@ def run(args, link):
     # block does get caught since exit itself throws a
     # SystemExit exception.
     sys.exit(1)
-
+import yappi
 def main(args):
   """
   Get configuration, get driver, get logger, and build handler and start it.
@@ -338,5 +339,31 @@ def main(args):
         else:
           run(args, link)
 
+import signal
+
+def signal_handler_c(signal, frame):
+  '''
+  Signal handler for SIG_INT.
+
+  Parameters
+  ----------
+  signal: int
+    signal number
+  frame: obj
+    current stack frame
+
+  Returns
+  -------
+  None
+  '''
+  global running
+  print('SIGINT detected, exiting')
+  running = False
+
 if __name__ == "__main__":
+  signal.signal(signal.SIGINT, signal_handler_c)
+  yappi.start()
   main(get_args())
+  yappi.get_func_stats().print_all()
+  yappi.get_thread_stats().print_all()
+
